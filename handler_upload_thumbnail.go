@@ -1,14 +1,23 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
 )
+
+var mimeToExt = map[string]string{
+	"image/jpeg": "jpg",
+	"image/png":  "png",
+	"image/gif":  "gif",
+	"image/webp": "webp",
+}
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
@@ -43,14 +52,27 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	defer file.Close()
 
 	mediaType := header.Header.Get("Content-Type")
-
-	data, err := io.ReadAll(file)
+	mType, _, err := mime.ParseMediaType(mediaType)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error reading file into memory", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type header", err)
+		return
 	}
 
-	b64Data := base64.StdEncoding.EncodeToString(data)
-	thumbnailURL := fmt.Sprintf("data:%s;base64,%s", mediaType, b64Data)
+	extension := mimeToExt[mType]
+	if extension == "" {
+		extension = "bin" // fallback
+	}
+
+	filePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoID, extension))
+	destFile, err := os.Create(filePath)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error creating file", err)
+	}
+
+	io.Copy(destFile, file)
+
+	thumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s.%s", cfg.port, videoID, extension)
 
 	metadata, err := cfg.db.GetVideo(videoID)
 	if err != nil {
@@ -61,12 +83,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "That is not your video", nil)
 	}
 
-	/*
-		tn := thumbnail{data, mediaType}
-		videoThumbnails[videoID] = tn
-
-		thumbnailURL := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoID)
-	*/
 	metadata.ThumbnailURL = &thumbnailURL
 	cfg.db.UpdateVideo(metadata)
 
