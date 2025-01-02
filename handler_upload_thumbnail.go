@@ -15,8 +15,6 @@ import (
 var mimeToExt = map[string]string{
 	"image/jpeg": "jpg",
 	"image/png":  "png",
-	"image/gif":  "gif",
-	"image/webp": "webp",
 }
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +46,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	file, header, err := r.FormFile("thumbnail")
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error parsing form data", err)
+		return
 	}
 	defer file.Close()
 
@@ -60,7 +59,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	extension := mimeToExt[mType]
 	if extension == "" {
-		extension = "bin" // fallback
+		respondWithError(w, http.StatusBadRequest, "Invalid media type", nil)
+		return
 	}
 
 	filePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoID, extension))
@@ -68,6 +68,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error creating file", err)
+		return
 	}
 
 	io.Copy(destFile, file)
@@ -77,10 +78,12 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	metadata, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error getting metadata", err)
+		return
 	}
 
 	if metadata.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "That is not your video", nil)
+		return
 	}
 
 	metadata.ThumbnailURL = &thumbnailURL
