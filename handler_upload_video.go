@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -21,17 +23,25 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Invalid video ID", err)
 		return
 	}
-	user, err := cfg.db.GetUserByRefreshToken(r.Header.Get("Authorization"))
+	token, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
 		return
 	}
-	userID := user.ID
-	if user.ID == uuid.Nil {
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+	if userID == uuid.Nil {
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 	metadata, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
+		return
+	}
 	if metadata.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
 		return
@@ -67,7 +77,14 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	fileNameBytes := make([]byte, 32)
 	rand.Read(fileNameBytes)
 	fileName := hex.EncodeToString(fileNameBytes) + ".mp4"
-	cfg.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{Bucket: aws.String(cfg.s3Bucket), Key: aws.String(fileName), Body: tempFile, ContentType: aws.String(videoMediaType)})
-	*metadata.VideoURL = "https://" + cfg.s3Bucket + ".s3." + cfg.s3Region + ".amazonaws.com/" + fileName
+	_, err = cfg.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{Bucket: aws.String(cfg.s3Bucket), Key: aws.String(fileName), Body: tempFile, ContentType: aws.String(videoMediaType)})
+	if err != nil {
+		fmt.Printf("error uploading video to S3: %v\n", err)
+		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
+		return
+	}
+	videoURL := "https://" + cfg.s3Bucket + ".s3." + cfg.s3Region + ".amazonaws.com/" + fileName
+	metadata.VideoURL = &videoURL
 	cfg.db.UpdateVideo(metadata)
+	fmt.Println("uploaded video", videoID, "by user", userID, "at URL", videoURL)
 }
