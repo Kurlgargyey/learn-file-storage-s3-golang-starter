@@ -17,7 +17,7 @@ import (
 )
 
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
-	http.MaxBytesReader(w, r.Body, 1<<30) // 1GB max
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<30) // 1GB max
 	videoID, err := uuid.Parse(r.PathValue("videoID"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid video ID", err)
