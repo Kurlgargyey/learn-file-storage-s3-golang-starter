@@ -73,11 +73,37 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
 		return
 	}
-	tempFile.Seek(0, io.SeekStart)
+	fastStart, err := cfg.processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
+		return
+	}
+	fastStartFile, err := os.Open(fastStart)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
+		return
+	}
+	defer os.Remove(fastStart)
+	defer fastStartFile.Close()
 	fileNameBytes := make([]byte, 32)
 	rand.Read(fileNameBytes)
 	fileName := hex.EncodeToString(fileNameBytes) + ".mp4"
-	_, err = cfg.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{Bucket: aws.String(cfg.s3Bucket), Key: aws.String(fileName), Body: tempFile, ContentType: aws.String(videoMediaType)})
+
+	aspectRatio, err := cfg.getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
+		return
+	}
+	switch aspectRatio {
+	case "16:9":
+		fileName = "landscape/" + fileName
+	case "9:16":
+		fileName = "portrait/" + fileName
+	default:
+		fileName = "other/" + fileName
+	}
+
+	_, err = cfg.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{Bucket: aws.String(cfg.s3Bucket), Key: aws.String(fileName), Body: fastStartFile, ContentType: aws.String(videoMediaType)})
 	if err != nil {
 		fmt.Printf("error uploading video to S3: %v\n", err)
 		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
