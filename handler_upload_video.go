@@ -46,11 +46,13 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
 		return
 	}
-	metadata, err = cfg.dbVideoToSignedVideo(metadata)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
-		return
-	}
+	/*
+		metadata, err = cfg.dbVideoToSignedVideo(metadata)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
+			return
+		}
+	*/
 	videoFile, videoFileHeader, err := r.FormFile("video")
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid video", err)

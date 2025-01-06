@@ -2,18 +2,11 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"math"
 	"os"
 	"os/exec"
-	"strings"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 )
 
 func (cfg apiConfig) ensureAssetsDir() error {
@@ -64,6 +57,7 @@ func roundFloat(f float64, precision int) float64 {
 	return math.Round(f*shift) / shift
 }
 
+/*
 func (cfg apiConfig) generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
 	presign := s3.NewPresignClient(s3Client)
 	presignReq, err := presign.PresignGetObject(context.TODO(), &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}, s3.WithPresignExpires(expireTime))
@@ -88,3 +82,4 @@ func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video
 	video.VideoURL = &signedURL
 	return video, nil
 }
+*/
