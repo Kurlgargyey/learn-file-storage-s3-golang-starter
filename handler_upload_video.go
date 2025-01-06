@@ -116,7 +116,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Internal server error", err)
 		return
 	}
-	videoURL := "https://" + cfg.s3CfDistribution + fileName
+	videoURL := cfg.s3CfDistribution + "/" + fileName
 	//videoURL := cfg.s3Bucket + "," + fileName
 	metadata.VideoURL = &videoURL
 	cfg.db.UpdateVideo(metadata)
