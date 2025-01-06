@@ -65,7 +65,7 @@ func roundFloat(f float64, precision int) float64 {
 }
 
 func (cfg apiConfig) generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	presign := s3.NewPresignClient(cfg.s3Client)
+	presign := s3.NewPresignClient(s3Client)
 	presignReq, err := presign.PresignGetObject(context.TODO(), &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}, s3.WithPresignExpires(expireTime))
 	if err != nil {
 		return "", err
